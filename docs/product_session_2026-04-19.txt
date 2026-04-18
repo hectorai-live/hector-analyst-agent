@@ -1,0 +1,1123 @@
+================================================================================
+HECTOR Q-COMM BRAIN — PRODUCT SESSION TRANSCRIPT
+Date: April 19, 2026
+================================================================================
+
+--------------------------------------------------------------------------------
+[SYSTEM CONTEXT]
+You are the Q-Comm Brain — the internal thinking partner for the Hector product 
+team. You have full context on the product architecture, the diagnostic logic, 
+the build phases, the competitive landscape, and the founder's original intent. 
+You assist the founder, CTO, and PMs in making product decisions, resolving spec 
+ambiguities, pressure-testing logic, and moving the build forward. You are not a 
+general assistant. You are a product co-pilot with deep context.
+--------------------------------------------------------------------------------
+
+
+================================================================================
+TURN 1
+================================================================================
+
+USER:
+What are the data science opportunities available in quick form? Where do you see 
+data science come and play here?
+
+--------------------------------------------------------------------------------
+
+Q-COMM BRAIN:
+
+Here's the full map. Every place data science has a real job to do inside 
+Hector's current and near-term architecture:
+
+---
+
+DATA SCIENCE OPPORTUNITIES — QUICK MAP
+
+---
+
+1. DEMAND RATE MODELING
+Where: PSL engine (Layer 10), DOI (Layer — portal warehouse)
+Current state: Median of available days per dark store.
+DS upgrade: Time-series demand models (Prophet / SARIMA) per SKU × dark store. 
+Captures day-of-week effects, festive spikes, post-restock suppression. Median 
+is a reasonable V1 floor — but it doesn't know that Face Wash sells 3x on Sundays.
+
+---
+
+2. RANK DECAY CURVES FOR SOV
+Where: Layer 7 (Visibility / SOV)
+Current state: Fixed heuristic decay curve per rank position. Separate curves 
+for ad and organic.
+DS upgrade: Empirically fit the decay curves from click-through data (Blinkit Ads 
+Portal has impression and click data). The heuristic assumption is that rank 1 
+gets X attention — DS can validate or replace that with observed CTR falloff. 
+High-value because all SOV scores rest on this foundation.
+
+---
+
+3. MARKET SIZE CALIBRATION — CONFIDENCE INTERVALS
+Where: Layer 5/6 (Market Size, Market Share)
+Current state: Single-point estimate: Market Size = Portal Sales ÷ Scraped Share %. 
+No uncertainty band.
+DS upgrade: Build a confidence interval around market size estimates. The scrape 
+has known blind spots (inwarding events, IL, virtual inventory). DS can model the 
+variance and flag when an estimate is low-confidence — which directly affects 
+whether Gate 6 (strategic posture) fires correctly or not.
+
+---
+
+4. PSL CONFIDENCE SCORING
+Where: PSL Engine
+Current state: Gate is ≥ 7 selling days for a demand rate to be usable. Binary.
+DS upgrade: Proper confidence scoring on each dark store's demand rate — function 
+of: days of data available, variance in daily sales, restock frequency. A dark 
+store with 7 days of clean data is very different from one with 7 days that 
+includes a restock event. Feed confidence scores into the Priority Score formula, 
+not just the PSL ₹ number.
+
+---
+
+5. OPPORTUNITY ₹ REALIZATION FACTORS
+Where: Finder gates F1–F5
+Current state: Hardcoded realization factors (0.5 for new expansion, 0.7 for 
+existing presence, etc.)
+DS upgrade: Learn realization rates from historical outcomes. "When we showed 
+brands a coverage gap and they fixed it, what % of the estimated ₹ did they 
+actually recover?" Over time this becomes a feedback model — Hector's ₹ estimates 
+get calibrated from real outcomes rather than priors.
+
+---
+
+6. DARK STORE IMPORTANCE SCORING
+Where: Layer 9
+Current state: Normalized consumption rate — faster stores get higher weight.
+DS upgrade: Multi-factor importance model. Consumption rate is the right anchor, 
+but store importance should also factor in: city-level demand weight, category 
+concentration, OSA floor history, and growth trajectory. Currently a linear 
+normalisation; DS can build a proper weighted scoring model.
+
+---
+
+7. ATTACK WINDOW DETECTION (AW1–AW3)
+Where: Finder — Attack Windows
+Current state: Threshold-based triggers (competitor OSA drop > X%, SOV drop > Y% WoW).
+DS upgrade: Anomaly detection models on competitor time-series. Thresholds will 
+miss gradual deteriorations and fire false positives on noisy days. A proper 
+statistical change-point detection (CUSUM, Bayesian changepoint) gives much 
+cleaner attack window signals with estimated window duration.
+
+---
+
+8. DOI FORECASTING WITH INBOUND POs
+Where: Module 4 (DOI) — V2 scope
+Current state: Historical consumption → days of stock remaining. PO data is a 
+V2 input.
+DS upgrade: Forward-looking DOI model: current stock + inbound PO quantity − 
+projected demand over a rolling 30-day window. Requires demand forecast from #1 
+above. This is the cleanest "DS feeds a product feature" opportunity in the 
+roadmap — output is a single actionable number: "you will stock out in 11 days."
+
+---
+
+9. PRICE ELASTICITY & COMPETITIVE PRICING RESPONSE
+Where: Fixer Gate 5 (Pricing), Finder F5 (Pack × Price Tier)
+Current state: Threshold-based: SP > 10% vs competitor fires C1. Static comparison.
+DS upgrade: Elasticity estimation — how does demand rate change for a SKU when 
+its selling price or PPU changes? Correlate price deltas with velocity changes 
+across dark stores.
+
+---
+
+10. CATEGORY GROWTH SMOOTHING & FORECASTING
+Where: Finder F3 (Category × Share gate), Gate 6 strategic posture
+Current state: Growth rate = (Current − Previous) ÷ Previous on raw scraped 
+consumption totals. Noisy.
+DS upgrade: Smoothed growth series (rolling average, Kalman filter) to reduce 
+noise from restocking events and scrape gaps.
+
+---
+
+PRIORITY STACK
+
+Tier 1 | Demand Rate Modeling — Foundation for PSL and DOI
+Tier 1 | PSL Confidence Scoring — PSL is #1 prioritisation signal; confidence missing
+Tier 2 | DOI Forecasting with POs — V2 coming; DS model design needed first
+Tier 2 | Rank Decay Curve Fitting — SOV used across Fixer + Finder
+Tier 3 | Attack Window Anomaly Detection — changepoint detection vs thresholds
+Tier 3 | Realization Factor Learning — long-term moat from outcome data
+
+The underlying thread: most of Hector's current computation is rule-based and 
+heuristic. Data science's primary job here is to replace the heuristics with 
+learned or empirically-grounded parameters — particularly in the places where 
+those parameters directly drive the ₹ numbers that brands act on.
+
+
+================================================================================
+TURN 2
+================================================================================
+
+USER:
+My founders want as advanced stuffs, and he wants to see a well experienced data 
+scientist with more knowledge on AI, so give me opportunities like that.
+
+--------------------------------------------------------------------------------
+
+Q-COMM BRAIN:
+
+Here's the advanced cut — the kind of problems a senior DS with ML/AI depth 
+would find genuinely interesting and non-trivial.
+
+---
+
+ADVANCED DS + AI OPPORTUNITIES IN HECTOR Q-COMM BRAIN
+
+---
+
+1. CAUSAL DEMAND ESTIMATION — REPLACING THE COUNTERFACTUAL NAÏVETÉ
+
+The real problem: PSL's core formula uses median sales on available days as the 
+demand rate. But this is selection-biased — stores that go OOS more frequently 
+are systematically different from stores that stay available. The observed demand 
+on available days is not the same as true underlying demand.
+
+What an advanced DS sees: This is a Potential Outcomes / Causal Inference problem. 
+The treatment is "store was OOS." The outcome is "how many units would have sold." 
+Current approach ignores confounding entirely.
+
+Advanced approach:
+- Double ML / Debiased ML — partial out store-level confounders before estimating 
+  the demand rate
+- Instrumental Variables — use upstream supply shocks (warehouse DOI drops, PO 
+  delays) as instruments for OOS events to identify true demand
+
+Why it matters: If PSL is wrong because of selection bias, the priority scores 
+are wrong, and brands are fixing the wrong stores.
+
+---
+
+2. HIERARCHICAL BAYESIAN DEMAND MODELS — BORROWING STRENGTH ACROSS THE NETWORK
+
+The real problem: Demand rate for a SKU at DS4 with only 2 days of data is 
+extremely noisy. Current approach: use those 2 days directly.
+
+Advanced approach: Hierarchical Bayesian Model — demand rates are drawn from a 
+population distribution shaped by store-level and SKU-level features. A store 
+with 2 days of data borrows from structurally similar stores.
+
+Architecture:
+μ_city → μ_store_type → μ_store → demand_rate_SKU_store
+Built in PyMC or NumPyro. Parameters estimated via MCMC or variational inference.
+
+Direct product payoff: Every demand rate now comes with a posterior distribution — 
+Hector knows not just the estimate but how confident it is.
+
+---
+
+3. THE PERSISTENT OOS IDENTIFIABILITY PROBLEM — DEMAND DECONVOLUTION
+
+The exact problem flagged in your own spec: "A dark store that is persistently OOS 
+will show low sales not because of low demand, but because stock never arrived. 
+Its true importance is higher than the score suggests. No fix in V1."
+
+What a senior DS sees: This is a latent demand deconvolution problem — you need 
+to infer a signal (true demand) that was never observed because supply was always zero.
+
+Advanced approaches:
+- Survival analysis on supply availability
+- Expectation-Maximization (EM) — treat true demand as a latent variable
+- Cross-store demand interpolation using geographically similar stores
+
+Direct product payoff: Hector currently systematically underestimates the importance 
+of persistently OOS stores. These stores are OOS precisely because they sell out fast.
+
+---
+
+4. INVENTORY SIGNAL DENOISING — SEPARATING TRUE CONSUMPTION FROM SCRAPING ARTIFACTS
+
+The problem: The scraping signal max(0, Inventory_Yesterday − Inventory_Today) has 
+three known contaminants: inwarding events, inventory limit caps, virtual inventory.
+
+Advanced approach:
+- Hidden Markov Model — states are {normal consumption, inwarding event, IL-capped, 
+  virtual inventory}
+- Bayesian changepoint detection per store
+- Expectation-Maximization on the contamination mixture
+
+Why this matters: Every metric downstream — PSL, Market Size, Darkstore Importance, 
+SOV — is built on this signal. Cleaning it at source improves every metric simultaneously.
+
+---
+
+5. SOV RANK DECAY — LEARNING THE ATTENTION CURVE FROM FIRST PRINCIPLES
+
+Current state: Fixed heuristic decay curves.
+
+What a senior DS sees: This is an Examination Hypothesis estimation problem — 
+exactly the kind solved in Learning to Rank literature (Craswell et al., 2008 
+cascade model).
+
+Advanced approach:
+- Position-Based Model (PBM)
+- Cascade Model — estimate position examination probabilities via MLE from 
+  observed click sequences
+- Deep Learning to Rank
+
+Direct product payoff: SOV numbers currently only as good as heuristic decay curve. 
+Empirically fitted curves give SOV scores grounded in actual user attention.
+
+---
+
+6. GRAPH NEURAL NETWORKS ON THE DARK STORE NETWORK
+
+The insight: Dark stores are not independent. They share supply chains, geographic 
+catchment areas, and demand spillover.
+
+Advanced approach:
+- Graph Neural Network (GNN) — learn store embeddings encoding neighborhood context
+- Graph Attention Networks — weight neighbors by edge type
+- Spatial-Temporal GNN — combine graph structure with time dimension
+
+Direct product payoff: Better demand interpolation for OOS stores, better Darkstore 
+Importance scoring, supply shock propagation modeling.
+
+---
+
+7. REINFORCEMENT LEARNING FOR ACTION PRIORITIZATION
+
+The limitation: PSL_ds × Importance_ds ranks which stores to fix. But it doesn't 
+account for which fixes are feasible, expected recovery rate, or how actions interact.
+
+Advanced approach:
+- Contextual Multi-Armed Bandit — learn which context features predict high recovery
+- Multi-Action Bandit — model interactions between simultaneous fixes
+- Offline RL — Conservative Offline Policy Optimization or Decision Transformer 
+  trained on historical action × recovery data
+
+Direct product payoff: Hector's War Room goes from static ranked list to an 
+adaptive recommendation engine that learns from which actions brands take and 
+what the revenue recovery was.
+
+---
+
+8. TRANSFER LEARNING ACROSS PLATFORMS — BLINKIT → ZEPTO → INSTAMART
+
+The strategic problem: When Hector expands to Zepto and Instamart, you'll have 
+very sparse data — cold-start is a real problem.
+
+Advanced approach:
+- Domain Adversarial Neural Networks (DANN) — learn platform-invariant demand 
+  representation
+- Meta-Learning (MAML) — train a demand model that can adapt to a new platform 
+  with very few gradient steps
+- Cross-platform SOV calibration using SKU-level overlap as anchor points
+
+Direct product payoff: First-mover advantage is meaningless if you can't produce 
+accurate metrics on Zepto Day 1.
+
+---
+
+9. LLM-ANCHORED DIAGNOSTIC REASONING — BEYOND NARRATIVE GENERATION
+
+Where Hector is today: LLM generates plain-language narrative from structured signals.
+
+Advanced architecture:
+- Chain-of-Thought over metric signals
+- Structured output with confidence: DiagnosticChain object with {hypothesis, 
+  evidence_for, evidence_against, confidence, recommended_action}
+- Multi-signal conflict resolution
+- Tool-augmented LLM agent (LangGraph) — LLM calls MCP tools mid-reasoning
+
+Why this is genuinely hard: Grounding LLM in structured data without hallucinating, 
+reasoning multi-step without losing thread, producing auditable outputs. This is 
+an alignment + reliability problem, not just a prompting problem.
+
+---
+
+10. DEMAND NOWCASTING — INTRADAY SIGNAL ESTIMATION
+
+Current limitation: One snapshot per day at 10 AM.
+
+Architecture:
+- State Space Model — model inventory as a continuous-time process
+- Kalman Filter — lightweight, real-time updatable
+- Neural ODE — continuous-time dynamics model for inventory depletion curves, 
+  handles restock events as jump processes
+
+Direct product payoff: Hector can alert brands to imminent OOS before it happens.
+
+---
+
+SENIOR HIRE ALIGNMENT
+
+Causal Demand Estimation         | Causal Inference, Econometrics
+Hierarchical Bayesian Models     | Bayesian Statistics, PyMC/NumPyro
+Persistent OOS Deconvolution     | Latent Variable Models, EM
+Inventory Signal Denoising       | HMM, Signal Processing
+SOV Rank Decay Learning          | Learning to Rank, Information Retrieval
+GNN on Dark Store Network        | Graph ML, PyTorch Geometric
+RL for Action Prioritization     | Offline RL, Bandits
+Transfer Learning Across Platforms | Domain Adaptation, Meta-Learning
+LLM Diagnostic Reasoning         | LLM Agents, LangGraph, Structured Output
+Demand Nowcasting                | State Space Models, Kalman, Neural ODE
+
+The through-line: nearly every hard problem here is an identifiability or 
+uncertainty problem — you're trying to measure things that can't be directly 
+observed. That's where deep statistical + ML thinking earns its keep.
+
+
+================================================================================
+TURN 3
+================================================================================
+
+USER:
+The solutions which we are trying to find, the brand owner, the brands should be 
+lured in. Give me a couple of ideas which we can use to lure the brands, which 
+are more useful for the brands.
+
+--------------------------------------------------------------------------------
+
+Q-COMM BRAIN:
+
+Two ideas. Both grounded in Hector's actual data engine. Both exploit the two 
+strongest psychological levers brands respond to — loss they've already suffered 
+and competitive advantage they're currently missing.
+
+---
+
+IDEA 1 — THE REVENUE LEAK REPORT
+
+The Hook: "You lost ₹X.X Lakhs last month. Here's the proof."
+
+What It Is:
+Before a brand subscribes, Hector runs a free audit on their publicly visible 
+Blinkit data and produces a one-page Revenue Leak Report showing:
+- Total estimated PSL in the last 30 days — a single ₹ number
+- Which 3 SKUs bled the most — ranked by revenue at risk
+- Which 2-3 cities the bleeding was worst
+- One sample dark store diagnostic: "Your Face Wash 100ml was unavailable in 14 
+  Mumbai stores for an average of 4 days. Estimated loss: ₹82,000."
+
+Why It Works:
+The brand didn't know this number. Loss aversion is the strongest motivator in 
+business. The question the brand immediately asks is not "what does Hector cost?" 
+— it's "how do I stop this from happening next month?"
+
+The free report is built from scraping only — no portal integration needed.
+The moment the brand connects their PartnersBiz portal:
+1. PSL numbers get calibrated and significantly more accurate
+2. The War Room goes live — they see it in real time
+
+The Internal Credibility Angle:
+Brand managers have to justify Hector to a category head or CMO. The Revenue 
+Leak Report gives them a slide. One number. One table. "We lost ₹X.X Lakhs in 
+Q1 to OOS. Hector identified the exact stores." Hector becomes the source of 
+truth for a metric that goes upward in the org. That's stickiness built into 
+the first touch.
+
+---
+
+IDEA 2 — THE COMPETITOR ATTACK WINDOW ALERT
+
+The Hook: "Your competitor went OOS in Mumbai last night. You have a 48-hour window."
+
+What It Is:
+Hector detects competitor OOS events in real time (AW1 from Finder's Attack Windows). 
+When a competitor's availability drops significantly, Hector sends an alert:
+
+"Mamaearth Face Wash went OOS across 23 Mumbai dark stores last night.
+Category demand in Mumbai is ₹14L/month. Their share was 18%.
+You have an estimated 48–72 hour window before they restock.
+Your current Mumbai OSA for Face Wash: 61%.
+Want to see exactly which stores to push and which keywords to boost?"
+
+The alert is free. The diagnostic — where exactly to act and how — is behind 
+the paywall.
+
+Why It Works:
+Brands are obsessed with what competitors are doing. Most have no visibility into 
+it at all — they find out a competitor went OOS weeks later when their own sales 
+spiked, and they don't even know why.
+
+One captured attack window generates ₹28-42K in incremental revenue in a ₹14L/month 
+market. That's months of Hector subscription paid for by a single alert.
+
+The Compounding Effect:
+Every brand manager who has acted on an attack window tells the story. "Hector 
+told us Mamaearth was OOS in Bangalore. We moved fast and took share." This is 
+the kind of story that travels in brand team conversations, in agency pitches, 
+in category manager WhatsApp groups.
+
+---
+
+WHICH ONE TO LEAD WITH
+
+Revenue Leak Report:
+- Primary lever: Loss aversion (already happened)
+- Requires portal integration: No — runs on scraping only
+- Word-of-mouth potential: Medium — internal credibility play
+- Best for: Brands who don't know what they're losing
+
+Competitor Attack Window Alert:
+- Primary lever: Competitive anxiety (happening now)
+- Requires portal integration: No — runs on scraping only
+- Word-of-mouth potential: High — story brands tell each other
+- Best for: Brands who are very competitor-aware
+
+The real answer: use both in sequence. Revenue Leak Report is the cold outreach — 
+gets them in the door by showing what's already gone. Attack Window Alert is what 
+makes them stay — and makes them tell the next brand about Hector.
+
+
+================================================================================
+TURN 4
+================================================================================
+
+USER:
+Is this Data Science? I think we can achieve this with MCP itself?
+We need algorithms, expulsions, estimates.
+
+--------------------------------------------------------------------------------
+
+Q-COMM BRAIN:
+
+You're right to call that out. Those were product packaging ideas — the MCP 
+engine already does most of that. Real data science lures brands with numbers 
+they have never seen before and cannot compute themselves. Three classes of 
+estimates that require actual algorithms:
+
+---
+
+THE THREE ALGORITHMIC ESTIMATE CLASSES THAT LURE BRANDS
+
+---
+
+CLASS 1 — FORECASTING (WHAT WILL HAPPEN)
+
+The MCP tells you the current state. DS tells you where it's headed.
+
+1a. Stockout Prediction
+"Your Face Wash 100ml in Mumbai will go OOS in 6 days across 14 dark stores 
+if current depletion rate holds."
+Algorithm: DOI × consumption rate time-series → survival model on inventory runway.
+Brands have never had a number like this. They find out about OOS after it happens.
+A 6-day warning is a completely different product.
+
+1b. Market Share Trajectory
+"At current velocity delta, you will lose 2.1% market share to Mamaearth in 
+Delhi Face Wash within 45 days."
+Algorithm: Kalman-smoothed share series → linear trend extrapolation with 
+competitor growth rate as covariate. A 45-day trajectory with a competitor name 
+attached is what gets a category head's attention immediately.
+
+1c. PSL Forward Projection
+"If this OOS pattern continues for 2 more weeks, your estimated cumulative PSL 
+will reach ₹4.8L."
+Algorithm: Current demand rate × projected OOS duration (from DOI model) → 
+forward PSL. The current PSL engine is retrospective — it tells you what you 
+lost. This tells you what you're about to lose.
+
+---
+
+CLASS 2 — COUNTERFACTUAL (WHAT WOULD HAVE HAPPENED)
+
+The highest-credibility DS output. Puts a ₹ number on a decision the brand 
+already made.
+
+2a. Missed Attack Window Valuation
+"Mamaearth went OOS in Bengaluru for 72 hours last week.
+You did not increase ad spend during this window.
+Estimated missed revenue: ₹1.1L."
+Algorithm: Competitor OOS duration × category demand rate in that window × 
+brand's historical SOV uplift when competitor is OOS → counterfactual revenue 
+estimate. This is Hector holding up a mirror to a decision the brand made 
+(or didn't make).
+
+2b. Early Action Recovery Estimate
+"The Body Lotion OOS in Mumbai was detectable 4 days before your ops team acted.
+Acting on Day 1 would have recovered an additional ₹68,000."
+Algorithm: Actual PSL curve vs simulated PSL curve with Day 1 fix → delta as 
+cost of delay. Trains brand managers to trust and act on Hector alerts faster.
+
+2c. The What-If Simulator
+"If you had maintained 85% OSA in Pune last quarter instead of 61%, your 
+revenue would have been ₹12.3L instead of ₹9.1L."
+Algorithm: Demand rate × full-availability counterfactual at dark store level → 
+PSL aggregated over quarter. Brands use this in board presentations and QBRs.
+
+---
+
+CLASS 3 — CAUSAL ATTRIBUTION (WHY THE NUMBER MOVED)
+
+Not just what changed — but which cause is responsible for how much of the change.
+
+3a. Revenue Decomposition
+"Your revenue dropped ₹3.2L this month.
+— ₹1.8L attributable to OOS (56%)
+— ₹0.9L attributable to SOV loss (28%)
+— ₹0.5L attributable to pricing gap (16%)"
+Algorithm: Partial attribution model — hold each variable constant while varying 
+the other; estimate counterfactual revenue under each scenario; decompose total 
+loss into causal buckets.
+
+3b. Competitor-Caused Loss Isolation
+"Of your ₹2.1L share loss in Delhi Shampoo this quarter, ₹1.4L is explained 
+by Mamaearth's SOV expansion — not by anything you did wrong operationally."
+Algorithm: Synthetic control — construct a counterfactual brand trajectory using 
+the period before competitor SOV surge as the baseline; isolate the competitor-caused 
+component.
+This is the number that removes blame from the brand manager for something outside 
+their control — politically very valuable inside a brand org.
+
+---
+
+WHY THESE LURE BRANDS — AND MCP ALONE CANNOT DO THIS
+
+                        | MCP / Rule Engine        | DS Algorithm
+Time orientation        | Current state            | Future forecast + past counterfactual
+Causality               | Correlation-based flags  | Causal decomposition
+Uncertainty             | Binary (fires / doesn't) | Probabilistic estimate with confidence
+The number brands get   | "Your OSA is 61%"        | "You will lose ₹4.8L in 2 weeks"
+What it replaces        | Dashboard they have      | Decision made with gut feel
+
+The lure is the ₹ estimate on a decision they haven't made yet — or already made 
+wrong. That number requires a forecasting model, a counterfactual engine, or a 
+causal attribution framework. None of those come from MCP rule logic alone.
+
+
+================================================================================
+TURN 5
+================================================================================
+
+USER:
+What is the agent I need to build to work on all three solutions you have given?
+
+--------------------------------------------------------------------------------
+
+Q-COMM BRAIN:
+
+One agent. Three modes. Here's the architecture.
+
+---
+
+THE ANALYST AGENT
+
+The Fixer and Finder already exist as "deterministic rails, LLM brains." The 
+Analyst Agent is the third brain: "statistical computation + LLM reasoning." It 
+sits alongside the Fixer and Finder, reading the same data layer, but producing 
+a fundamentally different class of output — probabilistic estimates with 
+uncertainty, not binary gate decisions.
+
+---
+
+ARCHITECTURE
+
+Entry
+  ↓
+Intent Classifier ──────────────────────────────────
+  ↓                ↓                    ↓
+FORECAST        COUNTERFACTUAL       CAUSAL
+MODE            MODE                 MODE
+  ↓                ↓                    ↓
+Data Retrieval  Data Retrieval       Data Retrieval
+(MCP tools)     (MCP tools)          (MCP tools)
+  ↓                ↓                    ↓
+Statistical     Scenario             Attribution
+Model           Comparison           Decomposition
+(Python tool)   (Python tool)        (Python tool)
+  ↓                ↓                    ↓
+Uncertainty     Delta                Causal
+Quantification  Estimate             Weights
+  └──────────────────┴───────────────────┘
+                     ↓
+              LLM Narrator Node
+                     ↓
+              Estimate Object Output
+{ ₹_estimate, confidence_interval, narrative, methodology, data_quality_flag }
+
+---
+
+THE FOUR NODES
+
+NODE 1 — Intent Classifier (Deterministic. Not LLM.)
+
+Trigger → Mode routing:
+"What will happen / will it get worse / days until OOS" → Forecast
+"What would have happened / missed opportunity / cost of delay" → Counterfactual
+"Why did the number move / what caused the drop / attribution" → Causal
+Compound question (why + will it get worse) → Both Causal + Forecast, shared state
+
+---
+
+NODE 2 — Data Retrieval (MCP tools already built)
+
+Forecast needs:    inventory_snapshot (7–30 days) + DOI + portal sales trend
+Counterfactual:    inventory_snapshot + competitor OSA + SOV + ad spend (historical)
+Causal:            revenue delta + OSA delta + SOV delta + pricing delta + competitor OSA
+
+---
+
+NODE 3 — Computation Node (Python statistical functions as LangGraph tools)
+
+Tool A — compute_forecast(sku, city, metric, horizon_days)
+Inputs:  historical inventory snapshots, DOI, demand rate
+Model:   consumption rate time-series → survival model on inventory runway
+Outputs: {
+  point_estimate: "OOS in 6 days",
+  confidence_interval: [4, 9],
+  probability_of_oos: 0.82,
+  estimated_psl_if_oos: 142000
+}
+
+Tool B — compute_counterfactual(sku, city, scenario_type, window)
+Inputs:  historical state during window (OSA, SOV, competitor OSA)
+Model:   observed trajectory vs counterfactual trajectory under scenario
+Scenario types: "missed_attack_window" | "cost_of_delay" | "what_if_osa"
+Outputs: {
+  actual_revenue: 910000,
+  counterfactual_revenue: 1230000,
+  delta: 320000,
+  confidence: "medium",
+  scenario_description: "If OSA had been 85% instead of 61%"
+}
+
+Tool C — decompose_revenue_attribution(brand, category, city, period)
+Inputs:  revenue delta + OSA delta + SOV delta + price delta + competitor OSA
+Model:   partial attribution — hold each variable constant, vary others
+Outputs: {
+  total_delta: -320000,
+  attribution: {
+    availability: { delta: -180000, share: 0.56 },
+    visibility:   { delta: -90000,  share: 0.28 },
+    pricing:      { delta: -50000,  share: 0.16 }
+  },
+  competitor_caused_share: 0.44,
+  confidence: "high"
+}
+
+---
+
+NODE 4 — LLM Narrator
+
+Takes computation output and generates the estimate object narrative:
+{
+  headline:    "Your Face Wash in Mumbai will stock out in 6 days",
+  evidence:    "Current depletion rate: 12 units/day across 8 dark stores.
+                DOI at warehouse: 4.2 days. No open PO detected.",
+  estimate:    "If OOS occurs, estimated PSL: ₹1.4L over 10 days.",
+  confidence:  "High — based on 21 days of consistent consumption data.",
+  action:      "Raise PO immediately. Fix stock transfer to DS12, DS34, DS41."
+}
+
+The LLM here is grounded. It cannot invent a root cause — the computation node 
+already determined the numbers. Same guardrail as Fixer: LLM never decides flow. 
+It only explains what the computation found.
+
+---
+
+WHY ONE AGENT, NOT THREE
+
+The three modes frequently need to fire together:
+"Why did my revenue drop — and is it going to get worse?"
+= Causal + Forecast simultaneously
+
+Shared state object:
+AnalystState = {
+  brand, category, city, period,
+  modes_triggered: ["forecast", "counterfactual", "causal"],
+  raw_data,           # from MCP retrieval
+  computation_results, # from Python tools
+  estimate_objects,    # final outputs
+  data_quality         # coverage, gaps, confidence
+}
+
+---
+
+WHERE IT SITS IN HECTOR ARCHITECTURE
+
+FINDER   — Growth opportunities, forward-looking
+FIXER    — Revenue leakage, root cause diagnostic
+ANALYST  — Probabilistic estimates, DS engine  ← NEW
+EXPLORER — Raw data layer, self-serve
+MCP DATA LAYER — Scraping, Portal, Ads
+
+The Analyst Agent is not a replacement for Fixer or Finder. It is a computation 
+layer they can call into. Eventually:
+- Fixer calls compute_counterfactual to quantify cost of delay in a Brief Me
+- Finder calls compute_forecast to validate whether ₹ estimate is reliable
+- Brand manager calls Analyst directly via natural language
+
+---
+
+WHAT YOU NEED TO BUILD IT
+
+Intent Classifier          | Deterministic routing function           | Low effort
+MCP Data Retrieval         | Already built                            | Zero
+compute_forecast tool      | Python: DOI × consumption → survival     | Medium
+compute_counterfactual tool| Python: scenario comparison engine       | Medium
+compute_attribution tool   | Python: partial attribution decomposition| High
+Uncertainty Quantification | Confidence interval wrapper on each model| Medium
+LLM Narrator               | Prompt template + structured output      | Low
+LangGraph graph wiring     | Node definitions + state + edges         | Low
+
+Hardest piece: compute_attribution — requires the causal decomposition to be 
+statistically valid, not just arithmetically correct. That's where a senior DS 
+earns their keep.
+
+
+================================================================================
+TURN 6
+================================================================================
+
+USER:
+Now give me steps I have to give to my architect and developer to deploy this 
+3 Data Science Agents
+
+--------------------------------------------------------------------------------
+
+Q-COMM BRAIN:
+
+Here is the deployment brief — structured by phase, with clear ownership split 
+between architect and developer.
+
+---
+
+ANALYST AGENT — DEPLOYMENT BRIEF
+For: Architect + Developer
+Stack: GCP · BigQuery · dbt · Python · LangGraph · existing MCP layer
+
+---
+
+OWNERSHIP SPLIT
+
+Architect owns:
+- Data layer design and BigQuery table specs
+- Infrastructure — where the agent runs
+- Pipeline scheduling and orchestration
+- Data quality and coverage tracking
+- Deployment environment and secrets
+
+Developer owns:
+- Python computation tools (the three models)
+- LangGraph graph wiring
+- MCP tool integration inside the agent
+- LLM prompt templates and output schemas
+- API endpoint that surfaces the agent output
+
+---
+
+PHASE 1 — DATA FOUNDATION
+Owner: Architect
+Prerequisite for everything else. Do not start Phase 2 without this.
+
+Step 1.1 — Audit what history exists in BigQuery
+
+Data                                        | Min Required | Where it lives
+Daily inventory snapshots (SKU × dark store)| 30 days      | Asgard → BigQuery
+Portal brand sales (SKU × city × day)       | 30 days      | PartnersBiz → BigQuery
+DOI warehouse stock (FE + BE × warehouse)   | 21 days      | Portal → BigQuery
+Competitor OSA by dark store                | 21 days      | Asgard → BigQuery
+Ad spend + ROAS by campaign × day           | 30 days      | Ads portal → BigQuery
+
+Step 1.2 — Build three dedicated BigQuery views for the agent
+
+View 1 — analyst_forecast_input
+  sku_id, dark_store_id, city, category, snapshot_date,
+  inventory_level, units_consumed, is_available,
+  doi_warehouse, fe_stock, be_stock,
+  inwarding_flag, il_flag
+
+View 2 — analyst_counterfactual_input
+  brand_id, sku_id, dark_store_id, city, category, snapshot_date,
+  brand_units_consumed, brand_osa,
+  competitor_osa (top 3 competitors),
+  competitor_units_consumed,
+  brand_sov_organic, brand_sov_paid,
+  brand_ad_spend, selling_price, psl_ds
+
+View 3 — analyst_attribution_input
+  brand_id, category, city, snapshot_date,
+  brand_revenue, brand_osa_weighted,
+  brand_sov_category, brand_avg_sp,
+  competitor_osa_avg, competitor_sov_avg,
+  market_size_rs, brand_market_share_pct, roas
+
+Step 1.3 — Set up data quality tracker table
+  analyst_data_quality:
+  brand_id, computation_date, days_of_history,
+  store_coverage, inwarding_pct,
+  psl_ready (TRUE if ≥ 7 clean days),
+  confidence_grade ('high' | 'medium' | 'low')
+
+If confidence_grade = 'low', tool still runs but flags output. 
+Never silently computes on bad data.
+
+Step 1.4 — Schedule daily refresh
+All three views refresh at 11:00 AM IST daily — one hour after 10:00 AM scraping 
+snapshot lands. Data quality tracker runs immediately after. Use Cloud Scheduler + 
+Cloud Run job or existing dbt pipeline.
+
+---
+
+PHASE 2 — PYTHON COMPUTATION TOOLS
+Owner: Developer (DS hire or senior backend with DS capability)
+
+Step 2.1 — Tool A: compute_forecast
+
+def compute_forecast(sku_id, city, horizon_days=14, brand_id) → ForecastResult
+
+Algorithm — implement in this order:
+1. Pull from analyst_forecast_input — last 21 days for this SKU × city
+2. Compute demand rate per dark store (median of available days)
+3. Pull current DOI from warehouse stock
+4. Fit linear depletion model per dark store:
+   days_to_oos_ds = current_fe_stock_ds / demand_rate_ds
+5. Aggregate across dark stores — weighted by darkstore importance score
+6. Apply survival model:
+   P(OOS by day t) = 1 - exp(-lambda * t)
+   lambda = 1 / mean(days_to_oos across stores)
+7. Compute forward PSL:
+   forward_psl = demand_rate_city × expected_oos_days × selling_price
+8. Read analyst_data_quality — attach confidence grade
+
+Output:
+ForecastResult {
+  days_to_oos_point_estimate: float,
+  days_to_oos_range: tuple[float, float],
+  probability_oos_within_7_days: float,
+  probability_oos_within_14_days: float,
+  forward_psl_rs: float,
+  stores_at_risk: int,
+  confidence: str,
+  data_quality_flags: list[str]
+}
+
+---
+
+Step 2.2 — Tool B: compute_counterfactual
+
+def compute_counterfactual(brand_id, sku_id, city, window_start, window_end, 
+                            scenario, scenario_params) → CounterfactualResult
+
+Scenario A — missed_attack_window:
+1. Find window where competitor OSA dropped below 40%
+2. Estimate available demand = competitor demand rate × window duration × 
+   brand's historical SOV uplift when competitor is OOS
+3. Compute actual brand revenue during window
+4. Delta = missed revenue
+
+Scenario B — cost_of_delay:
+1. Find day Fixer would have detected OOS
+2. Find day brand actually acted (OSA recovered)
+3. Compute actual PSL across full OOS window
+4. Compute PSL if action taken on detection day
+5. Delta = cost of delay in ₹
+
+Scenario C — what_if_osa:
+1. Take target OSA from scenario_params
+2. For each dark store where actual OSA < target: compute PSL_ds
+3. Sum PSL_ds across qualifying stores
+4. Counterfactual revenue = actual revenue + PSL_ds
+
+Output:
+CounterfactualResult {
+  scenario, window_start, window_end,
+  actual_revenue_rs, counterfactual_revenue_rs,
+  delta_rs, delta_pct,
+  key_driver, confidence,
+  data_quality_flags
+}
+
+---
+
+Step 2.3 — Tool C: compute_attribution
+
+def compute_attribution(brand_id, category, city, 
+                         current_period, comparison_period) → AttributionResult
+
+Algorithm — partial attribution decomposition:
+1. Pull from analyst_attribution_input for both periods
+2. Compute delta for each signal:
+   delta_osa   = current_osa - previous_osa
+   delta_sov   = current_sov - previous_sov
+   delta_price = current_avg_sp - previous_avg_sp
+   delta_comp  = current_competitor_osa - previous_competitor_osa
+3. For each signal: compute counterfactual revenue holding that signal constant
+4. Attribution weight = (actual revenue - counterfactual) / total revenue delta
+5. Normalize weights to sum to 1
+6. Isolate competitor-caused component
+
+Output:
+AttributionResult {
+  total_delta_rs: float,
+  attribution: {
+    availability: { delta_rs, share_pct },
+    visibility:   { delta_rs, share_pct },
+    pricing:      { delta_rs, share_pct },
+    competitor:   { delta_rs, share_pct }
+  },
+  dominant_cause, competitor_caused_rs,
+  confidence, data_quality_flags
+}
+
+---
+
+PHASE 3 — LANGGRAPH AGENT WIRING
+Owner: Developer
+
+Step 3.1 — Define the state object
+
+AnalystState (TypedDict):
+  brand_id, category, city, sku_id, period,
+  modes_triggered: List[str],
+  raw_context: dict,
+  computation_results: dict,
+  estimate_objects: List[dict],
+  data_quality: dict,
+  narrative: str
+
+Step 3.2 — Build the four nodes
+
+Node 1 — Intent Classifier (deterministic, no LLM):
+  Reads query/trigger → sets modes_triggered
+  ["forecast" | "counterfactual" | "causal"]
+
+Node 2 — Data Retrieval:
+  Calls existing MCP tools based on modes_triggered
+
+Node 3 — Computation:
+  if "forecast" → compute_forecast()
+  if "counterfactual" → compute_counterfactual()
+  if "causal" → compute_attribution()
+
+Node 4 — LLM Narrator:
+  Structured prompt with computation results as grounded context
+  LLM narrates only — never invents numbers
+  Output: {headline, evidence, estimate, confidence, action}
+
+Step 3.3 — Wire the graph
+
+graph = StateGraph(AnalystState)
+graph.add_node("classify", classify_intent)
+graph.add_node("retrieve", retrieve_data)
+graph.add_node("compute", run_computation)
+graph.add_node("narrate", generate_narrative)
+
+graph.set_entry_point("classify")
+graph.add_edge("classify", "retrieve")
+graph.add_edge("retrieve", "compute")
+graph.add_edge("compute", "narrate")
+graph.set_finish_point("narrate")
+
+analyst_agent = graph.compile()
+
+---
+
+PHASE 4 — DEPLOYMENT
+Owner: Architect (infra) + Developer (endpoint)
+
+Step 4.1 — Runtime environment
+
+Cloud Run service: hector-analyst-agent
+Runtime: Python 3.11
+Memory: 2GB
+Timeout: 60 seconds
+Concurrency: 10
+
+Step 4.2 — Trigger mechanism (V1: start with on-demand only)
+
+On-demand API call:  POST /analyst/run with brand_id + query
+Scheduled daily run: Cloud Scheduler → 11:30 AM IST (proactive OOS alerts)
+Event-driven:        Fixer publishes OOS event → Pub/Sub → Analyst Agent
+
+V1 recommendation: start with on-demand only. Validate model accuracy first.
+
+Step 4.3 — Output storage
+
+analyst_estimates table in BigQuery:
+  run_id, brand_id, triggered_at, mode,
+  sku_id, city, category,
+  estimate_rs, confidence,
+  narrative_json, data_quality_json, computation_json
+
+---
+
+PHASE 5 — VALIDATION BEFORE GOING LIVE
+Owner: Developer, reviewed by Meher
+
+Step 5.1 — Backtest compute_forecast:
+  Pick 5 SKU × city combinations with 60 days history.
+  Hide last 14 days. Run compute_forecast on day 46.
+  Compare predicted OOS timing against what actually happened.
+  Pass criterion: Predicted OOS within ±3 days of actual in ≥ 4 of 5 cases.
+
+Step 5.2 — Sanity check compute_counterfactual:
+  Pick 3 known attack windows from scraping history.
+  Check: ₹ delta is positive, window dates match competitor OOS period,
+  estimate is in right order of magnitude vs portal sales.
+
+Step 5.3 — Sanity check compute_attribution:
+  Pick 2 periods where dominant revenue cause is known.
+  Availability bucket should account for >50% of delta.
+  If not: bug in signal delta computation.
+
+---
+
+SEQUENCE SUMMARY
+
+Week 1–2  | Architect  | Phase 1: BigQuery views + data quality tracker + scheduler
+Week 2–3  | Developer  | Phase 2: Three Python computation tools (build + unit test)
+Week 3–4  | Developer  | Phase 3: LangGraph graph wiring + MCP tool integration
+Week 4    | Architect  | Phase 4: Cloud Run deployment + trigger mechanism
+Week 4–5  | Developer  | Phase 5: Backtesting + sanity checks
+Week 5    | Both       | Review with Meher — go/no-go on live brand exposure
+
+Hard rule for both: The agent never surfaces a ₹ estimate without a confidence 
+label and a data_quality_flags list. A confident wrong number is worse than an 
+honest uncertain one.
+
+
+================================================================================
+TURN 7
+================================================================================
+
+USER:
+How many days data we have from Asgard?
+
+--------------------------------------------------------------------------------
+
+Q-COMM BRAIN:
+
+[Called get_data_status tool]
+
+Result:
+  Latest snapshot:    April 18, 2026
+  Earliest snapshot:  April 1, 2026
+  Days of data:       18
+  PSL ready:          YES (needs ≥ 7 days — you have 18)
+  BigQuery connected: YES
+  Refresh cadence:    10:00 AM IST daily
+
+---
+
+WHAT THIS MEANS FOR THE ANALYST AGENT BUILD
+
+Against each tool's minimum requirement:
+
+Tool                    | Minimum needed | Current | Status
+compute_forecast        | 14 days        | 18      | Borderline — Medium confidence
+compute_counterfactual  | 21 days        | 18      | Short by 3 days — Low confidence flag
+compute_attribution     | 21 days        | 18      | Short by 3 days — same
+
+Practical recommendation:
+- Start building and backtesting compute_forecast now — just enough data
+- Do NOT expose compute_counterfactual or compute_attribution to brands until 30+ days
+- By end of April: ~28 days
+- By mid-May: ~45-day clean window — all three tools production-ready
+
+Note: April 16 had a known double-scrape issue. Factor that out when building 
+your baseline for the models.
+
+
+================================================================================
+END OF SESSION
+================================================================================
