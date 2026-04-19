@@ -12,10 +12,8 @@ renormalised so shares sum to 1.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
-from typing import Any
+from datetime import date, datetime
 
-import numpy as np
 import pandas as pd
 
 from analyst.data import MockDataStore, get_store, grade_quality

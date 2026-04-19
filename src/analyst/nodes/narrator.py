@@ -46,18 +46,58 @@ def _narrate_one(result: dict[str, Any]) -> EstimateObject:
     return _narrate_with_template(result)
 
 
+_TOOL_SCHEMA = {
+    "name": "emit_estimate",
+    "description": (
+        "Emit the final grounded estimate object. Every field must be "
+        "derived from the input result — do not invent numbers or dates."
+    ),
+    "input_schema": {
+        "type": "object",
+        "required": [
+            "headline",
+            "evidence",
+            "estimate",
+            "confidence",
+            "action",
+            "methodology",
+        ],
+        "properties": {
+            "headline": {"type": "string"},
+            "evidence": {"type": "string"},
+            "estimate": {"type": "string"},
+            "confidence": {"type": "string"},
+            "action": {"type": "string"},
+            "methodology": {"type": "string"},
+        },
+    },
+}
+
+
 def _narrate_with_llm(result: dict[str, Any], api_key: str) -> EstimateObject:
+    """Use Anthropic tool-use for robust structured output.
+
+    Tool-use guarantees the model returns a well-typed payload instead of
+    JSON-in-text which can be partial or malformed.
+    """
     import anthropic  # type: ignore
 
     client = anthropic.Anthropic(api_key=api_key)
     message = client.messages.create(
         model=MODEL,
-        max_tokens=600,
+        max_tokens=800,
         system=SYSTEM_PROMPT,
+        tools=[_TOOL_SCHEMA],
+        tool_choice={"type": "tool", "name": "emit_estimate"},
         messages=[{"role": "user", "content": json.dumps(result, default=str)}],
     )
-    text = message.content[0].text  # type: ignore[attr-defined]
-    payload = json.loads(text)
+    payload: dict[str, Any] | None = None
+    for block in message.content:  # type: ignore[attr-defined]
+        if getattr(block, "type", None) == "tool_use":
+            payload = block.input  # type: ignore[assignment]
+            break
+    if payload is None:
+        raise RuntimeError("narrator: tool_use block missing from response")
     return EstimateObject(
         headline=payload.get("headline", ""),
         evidence=payload.get("evidence", ""),
@@ -89,11 +129,16 @@ def _narrate_with_template(result: dict[str, Any]) -> EstimateObject:
 
 
 def _rs(v: float) -> str:
-    if v >= 10_00_000:
-        return f"₹{v / 1_00_000:.1f}L"
-    if v >= 1_000:
-        return f"₹{v / 1_000:.1f}K"
-    return f"₹{v:.0f}"
+    """Format INR with Indian lakh notation. Handles negatives cleanly."""
+    sign = "-" if v < 0 else ""
+    a = abs(v)
+    if a >= 1_00_00_000:  # >= 1 crore
+        return f"{sign}₹{a / 1_00_00_000:.2f}Cr"
+    if a >= 10_00_000:  # >= 10 lakh
+        return f"{sign}₹{a / 1_00_000:.1f}L"
+    if a >= 1_000:
+        return f"{sign}₹{a / 1_000:.1f}K"
+    return f"{sign}₹{a:.0f}"
 
 
 def _tpl_forecast(r: dict[str, Any]) -> EstimateObject:
@@ -159,7 +204,7 @@ def _tpl_counterfactual(r: dict[str, Any]) -> EstimateObject:
 def _tpl_attribution(r: dict[str, Any]) -> EstimateObject:
     attr = r["attribution"]
     buckets = ", ".join(
-        f"{k} {attr[k]['share_pct']:.0%} ({_rs(attr[k]['delta_rs'])})"
+        f"{k} {attr[k]['share_pct']:.0%} ({_rs(float(attr[k]['delta_rs']))})"
         for k in ("availability", "visibility", "pricing", "competitor")
     )
     return EstimateObject(

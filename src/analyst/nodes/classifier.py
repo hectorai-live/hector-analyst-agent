@@ -18,8 +18,10 @@ FORECAST_CUES = [
 ]
 COUNTERFACTUAL_CUES = [
     r"\bwould have\b", r"\bwhat if\b", r"\bmissed\b", r"\bcost of delay\b",
-    r"\bif we had\b", r"\bcould have\b", r"\bleft on the table\b",
+    r"\bif we had\b", r"\bcould have\b", r"\bshould have\b", r"\bleft on the table\b",
     r"\battack window\b", r"\bopportunity lost\b",
+    r"\bwould (?:we|they|I) have\b", r"\bcould (?:we|they|I) have\b",
+    r"\bcost us\b", r"\bcould .* saved\b", r"\brevenue lost\b",
 ]
 CAUSAL_CUES = [
     r"\bwhy\b", r"\bwhat caused\b", r"\battribution\b", r"\bdecompose\b",

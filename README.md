@@ -97,16 +97,35 @@ src/analyst/
 ├── cli.py              # analyst CLI
 ├── nodes/
 │   ├── classifier.py   # Deterministic intent classifier
-│   ├── retriever.py    # MCP data retrieval (mock)
+│   ├── retriever.py    # DataStore gate + quality attachment
 │   ├── computer.py     # Dispatch to the three tools
-│   └── narrator.py     # LLM narrator + template fallback
+│   └── narrator.py     # LLM narrator (tool-use) + template fallback
 ├── tools/
 │   ├── forecast.py         # compute_forecast (survival model)
 │   ├── counterfactual.py   # compute_counterfactual (3 scenarios)
 │   └── attribution.py      # compute_attribution (partial-attribution)
 └── data/
-    ├── mock.py         # Synthetic Asgard inventory/portal/competitor data
-    └── quality.py      # Data quality grader (high / medium / low)
+    ├── protocol.py     # DataStore Protocol (swap backends without touching tools)
+    ├── mock.py         # Synthetic 45-day Asgard store (seed=42)
+    ├── mcp_adapter.py  # Q-Comm MCP adapter (production path)
+    └── quality.py      # Data-quality grader (high / medium / low)
+scripts/
+├── run_demo.py         # end-to-end demo across all three modes
+└── backtest.py         # Phase 5 forecast calibration gate
+tests/                  # 36+ pytest cases; pass-gate for every PR
+docs/
+└── ARCHITECTURE.md     # deeper dive for architect/developer audiences
+```
+
+## Development workflow
+
+```bash
+make install    # pip install -e '.[dev]'
+make test       # pytest
+make lint       # ruff check
+make demo       # scripts/run_demo.py — prints all three modes
+make backtest   # scripts/backtest.py — calibration gate (±3d in 4/5)
+make ci         # lint + test + backtest
 ```
 
 ## Deployment brief
@@ -125,11 +144,16 @@ and a `data_quality_flags` list. Every tool consults
 
 ## Roadmap
 
-- [ ] Replace mock data store with real MCP tool calls against BigQuery
-- [ ] Swap the in-house graph runner for `langgraph.graph.StateGraph`
-- [ ] Add compound-mode orchestration (Causal + Forecast shared state)
-- [ ] Backtest harness against 60+ day history with ±3 day accuracy gate
-- [ ] Cloud Run deployment + Pub/Sub event trigger from Fixer OOS events
+- [x] Compound-mode orchestration (Causal + Forecast shared state) — see
+      `AnalystAgent.invoke` with multi-mode `modes_triggered`.
+- [x] Backtest harness with ±3-day accuracy gate — `scripts/backtest.py`
+      (currently passing 5 of 5 against the mock store).
+- [x] MCP data adapter (`analyst.data.mcp_adapter.MCPDataStore`) — wire to the
+      Q-Comm MCP client at deploy time.
+- [ ] Swap the in-house graph runner for `langgraph.graph.StateGraph` in prod.
+- [ ] Cloud Run deployment + Pub/Sub event trigger from Fixer OOS events.
+- [ ] Full-Shapley attribution (16 coalitions) once ≥ 60d history per
+      brand × category × city is available.
 
 ## License
 

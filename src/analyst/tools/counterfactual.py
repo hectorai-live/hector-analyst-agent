@@ -8,10 +8,8 @@ Three scenarios (per the deployment brief):
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
-import numpy as np
-import pandas as pd
 
 from analyst.data import MockDataStore, get_store, grade_quality
 from analyst.data.mock import CATALOG
@@ -128,8 +126,8 @@ def _scenario_cost_of_delay(
         .sort_values("snapshot_date")
     )
 
-    # Detectable day = first day OSA < 0.5
-    low = daily[daily["brand_osa"] < 0.5]
+    # Detectable day = first day OSA < 0.7 (significant city-wide availability drop)
+    low = daily[daily["brand_osa"] < 0.7]
     if low.empty:
         flags.append("no_oos_episode_detected")
         return _empty_cf(
