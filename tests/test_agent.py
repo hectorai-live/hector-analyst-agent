@@ -79,6 +79,52 @@ def test_every_estimate_has_confidence_grade():
         assert isinstance(cr["data_quality_flags"], list)
 
 
+def test_anomaly_mode_via_agent():
+    osa_vals = [
+        86.16, 93.91, 90.34, 90.18, 89.18, 88.75, 88.45, 88.48, 88.26,
+        88.14, 87.65, 89.82, 90.87, 90.79, 81.18, 83.03, 82.66, 79.94,
+    ]
+    osa_dates = [f"2026-04-{i + 1:02d}" for i in range(18)]
+    from analyst.agent import AnalystAgent
+    from analyst.schemas import AnalystState, Mode
+
+    state = AnalystState(
+        query="any anomalies in OSA?",
+        brand_id="Foxtale",
+        city="delhi",
+        series_input=osa_vals,
+        series_dates=osa_dates,
+    )
+    result = AnalystAgent().invoke(state)
+    assert Mode.ANOMALY in result.modes_triggered
+    assert any(cr["tool"] == "detect_anomalies" for cr in result.computation_results)
+    assert any(e.source_tool == "detect_anomalies" for e in result.estimate_objects)
+
+
+def test_changepoint_mode_via_agent():
+    osa_vals = [
+        86.16, 93.91, 90.34, 90.18, 89.18, 88.75, 88.45, 88.48, 88.26,
+        88.14, 87.65, 89.82, 90.87, 90.79, 81.18, 83.03, 82.66, 79.94,
+    ]
+    osa_dates = [f"2026-04-{i + 1:02d}" for i in range(18)]
+    from analyst.agent import AnalystAgent
+    from analyst.schemas import AnalystState, Mode
+
+    state = AnalystState(
+        query="when did the regime change for our brand?",
+        brand_id="Foxtale",
+        city="delhi",
+        series_input=osa_vals,
+        series_dates=osa_dates,
+    )
+    result = AnalystAgent().invoke(state)
+    assert Mode.CHANGEPOINT in result.modes_triggered
+    cp_results = [cr for cr in result.computation_results if cr["tool"] == "detect_changepoints"]
+    assert cp_results
+    # Live data should surface at least one cp near 2026-04-14
+    assert any("2026-04-1" in cp for cp in cp_results[0]["changepoints"])
+
+
 def test_narrator_grounded_in_numbers():
     """Narrator must echo numbers present in the computation result — no hallucination.
     We verify this by ensuring the forecast headline contains the point estimate

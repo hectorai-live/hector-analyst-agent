@@ -14,6 +14,10 @@ from analyst.tools import (
     compute_attribution,
     compute_counterfactual,
     compute_forecast,
+    denoise_signal,
+    detect_anomalies,
+    detect_changepoints,
+    estimate_elasticity,
 )
 
 
@@ -59,7 +63,88 @@ def run_computation(state: AnalystState) -> AnalystState:
         except Exception as e:
             state.errors.append(f"attribution_failed: {e!r}")
 
+    if Mode.DENOISE in state.modes_triggered:
+        try:
+            series = state.series_input or _series_from_state(state, kind="deltas")
+            if series is None:
+                raise ValueError("no series available to denoise")
+            result = denoise_signal(series, series_name=f"{state.sku_id or state.brand_id}_deltas")
+            state.computation_results.append(result.to_dict())
+        except Exception as e:
+            state.errors.append(f"denoise_failed: {e!r}")
+
+    if Mode.ANOMALY in state.modes_triggered:
+        try:
+            series = state.series_input or _series_from_state(state, kind="osa_or_units")
+            if series is None:
+                raise ValueError("no series available for anomaly detection")
+            result = detect_anomalies(
+                series,
+                dates=state.series_dates,
+                series_name=f"{state.brand_id}_{state.city or 'all'}",
+                kind="osa",
+            )
+            state.computation_results.append(result.to_dict())
+        except Exception as e:
+            state.errors.append(f"anomaly_failed: {e!r}")
+
+    if Mode.CHANGEPOINT in state.modes_triggered:
+        try:
+            series = state.series_input or _series_from_state(state, kind="osa_or_units")
+            if series is None:
+                raise ValueError("no series available for changepoint detection")
+            result = detect_changepoints(
+                series,
+                dates=state.series_dates,
+                series_name=f"{state.brand_id}_{state.city or 'all'}",
+            )
+            state.computation_results.append(result.to_dict())
+        except Exception as e:
+            state.errors.append(f"changepoint_failed: {e!r}")
+
+    if Mode.ELASTICITY in state.modes_triggered:
+        try:
+            from analyst.data import get_store
+
+            store = get_store()
+            panel = store.forecast_input(
+                sku_id=state.sku_id or _require(state, "sku_id"),
+                city=state.city or _require(state, "city"),
+            )
+            result = estimate_elasticity(
+                panel,
+                brand_id=state.brand_id,
+                city=state.city or "",
+            )
+            state.computation_results.append(result.to_dict())
+        except Exception as e:
+            state.errors.append(f"elasticity_failed: {e!r}")
+
     return state
+
+
+def _series_from_state(state: AnalystState, kind: str) -> list[float] | None:
+    """When no explicit series is supplied, try to pull one from the mock
+    store using brand_id / city context. Deterministic fallback so DENOISE /
+    ANOMALY / CHANGEPOINT are usable against canned data in CI."""
+    from analyst.data import get_store
+
+    if not state.city or not state.sku_id:
+        return None
+    store = get_store()
+    df = store.forecast_input(sku_id=state.sku_id, city=state.city)
+    if df.empty:
+        return None
+    daily = (
+        df.groupby("snapshot_date")
+        .agg(units=("units_consumed", "sum"), osa=("is_available", "mean"))
+        .reset_index()
+        .sort_values("snapshot_date")
+    )
+    state.series_dates = [str(d) for d in daily["snapshot_date"].tolist()]
+    if kind == "deltas":
+        return daily["units"].diff().fillna(0).tolist()
+    return daily["units"].tolist()
 
 
 def _require(state: AnalystState, field: str) -> str:

@@ -16,6 +16,10 @@ class Mode(str, Enum):
     FORECAST = "forecast"
     COUNTERFACTUAL = "counterfactual"
     CAUSAL = "causal"
+    DENOISE = "denoise"
+    ANOMALY = "anomaly"
+    CHANGEPOINT = "changepoint"
+    ELASTICITY = "elasticity"
 
 
 Confidence = Literal["high", "medium", "low"]
@@ -136,6 +140,135 @@ class AttributionResult:
 
 
 @dataclass
+class DenoisedSeriesResult:
+    """HMM / robust-filter output that separates restock noise from true demand."""
+
+    series_name: str
+    n_points: int
+    raw_mean: float
+    denoised_mean: float
+    restock_events: int
+    restock_mass: float  # sum of magnitudes attributed to restock state
+    noise_share_pct: float  # restock mass / raw mass
+    signal_to_noise_db: float
+    confidence: Confidence
+    data_quality_flags: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "tool": "denoise_signal",
+            "series_name": self.series_name,
+            "n_points": self.n_points,
+            "raw_mean": self.raw_mean,
+            "denoised_mean": self.denoised_mean,
+            "restock_events": self.restock_events,
+            "restock_mass": self.restock_mass,
+            "noise_share_pct": self.noise_share_pct,
+            "signal_to_noise_db": self.signal_to_noise_db,
+            "confidence": self.confidence,
+            "data_quality_flags": self.data_quality_flags,
+        }
+
+
+@dataclass
+class AnomalyEvent:
+    date: str
+    value: float
+    expected: float
+    residual: float
+    z_score: float
+    direction: Literal["spike", "drop"]
+    label: str  # e.g. "attack_window_start", "stealth_oos", "promo_spike"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "date": self.date,
+            "value": self.value,
+            "expected": self.expected,
+            "residual": self.residual,
+            "z_score": self.z_score,
+            "direction": self.direction,
+            "label": self.label,
+        }
+
+
+@dataclass
+class AnomalyReport:
+    series_name: str
+    n_points: int
+    alpha: float  # nominal false-positive rate
+    events: list[AnomalyEvent]
+    cusum_shift: float  # most recent CUSUM statistic
+    confidence: Confidence
+    data_quality_flags: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "tool": "detect_anomalies",
+            "series_name": self.series_name,
+            "n_points": self.n_points,
+            "alpha": self.alpha,
+            "events": [e.to_dict() for e in self.events],
+            "cusum_shift": self.cusum_shift,
+            "confidence": self.confidence,
+            "data_quality_flags": self.data_quality_flags,
+        }
+
+
+@dataclass
+class ChangepointResult:
+    series_name: str
+    n_points: int
+    changepoints: list[str]  # ISO dates
+    segment_means: list[float]
+    penalty: float
+    confidence: Confidence
+    data_quality_flags: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "tool": "detect_changepoints",
+            "series_name": self.series_name,
+            "n_points": self.n_points,
+            "changepoints": self.changepoints,
+            "segment_means": self.segment_means,
+            "penalty": self.penalty,
+            "confidence": self.confidence,
+            "data_quality_flags": self.data_quality_flags,
+        }
+
+
+@dataclass
+class ElasticityResult:
+    brand_id: str
+    city: str
+    n_observations: int
+    elasticity: float  # log-log β
+    elasticity_ci_low: float
+    elasticity_ci_high: float
+    r_squared: float
+    price_range: tuple[float, float]
+    interpretation: str  # "elastic", "inelastic", "unit_elastic"
+    confidence: Confidence
+    data_quality_flags: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "tool": "estimate_elasticity",
+            "brand_id": self.brand_id,
+            "city": self.city,
+            "n_observations": self.n_observations,
+            "elasticity": self.elasticity,
+            "elasticity_ci": [self.elasticity_ci_low, self.elasticity_ci_high],
+            "r_squared": self.r_squared,
+            "price_range": list(self.price_range),
+            "interpretation": self.interpretation,
+            "confidence": self.confidence,
+            "data_quality_flags": self.data_quality_flags,
+        }
+
+
+@dataclass
 class EstimateObject:
     """The final narrated output surfaced to brands."""
 
@@ -174,6 +307,8 @@ class AnalystState:
     window_start: str | None = None
     window_end: str | None = None
     target_osa: float | None = None
+    series_input: list[float] | None = None  # generic series for denoise/anomaly/changepoint
+    series_dates: list[str] | None = None
 
     modes_triggered: list[Mode] = field(default_factory=list)
     raw_context: dict[str, Any] = field(default_factory=dict)

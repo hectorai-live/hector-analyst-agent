@@ -27,6 +27,23 @@ CAUSAL_CUES = [
     r"\bwhy\b", r"\bwhat caused\b", r"\battribution\b", r"\bdecompose\b",
     r"\bdriver\b", r"\bdue to\b", r"\bbreak ?down\b", r"\bresponsible for\b",
 ]
+DENOISE_CUES = [
+    r"\bdenoise\b", r"\bclean (?:the )?signal\b", r"\bfilter (?:out )?restocks?\b",
+    r"\brestock noise\b", r"\btrue demand\b", r"\bhmm\b",
+]
+ANOMALY_CUES = [
+    r"\banomal(?:y|ies|ous)\b", r"\bspike[s]?\b", r"\bdrop ?off\b",
+    r"\battack window\b", r"\bstealth oos\b", r"\bpromo spike\b",
+    r"\bunusual\b", r"\boutlier[s]?\b",
+]
+CHANGEPOINT_CUES = [
+    r"\bchange ?point[s]?\b", r"\bregime change\b", r"\bwhen did .* (?:break|shift|change)\b",
+    r"\bstructural break\b", r"\binflection\b",
+]
+ELASTICITY_CUES = [
+    r"\belasticity\b", r"\bprice sensitiv(?:e|ity)\b",
+    r"\bif we (?:drop|raise|cut) price\b", r"\bprice response\b",
+]
 
 
 def classify_intent(state: AnalystState) -> AnalystState:
@@ -39,6 +56,14 @@ def classify_intent(state: AnalystState) -> AnalystState:
         triggered.append(Mode.COUNTERFACTUAL)
     if any(re.search(p, q) for p in CAUSAL_CUES):
         triggered.append(Mode.CAUSAL)
+    if any(re.search(p, q) for p in DENOISE_CUES):
+        triggered.append(Mode.DENOISE)
+    if any(re.search(p, q) for p in ANOMALY_CUES):
+        triggered.append(Mode.ANOMALY)
+    if any(re.search(p, q) for p in CHANGEPOINT_CUES):
+        triggered.append(Mode.CHANGEPOINT)
+    if any(re.search(p, q) for p in ELASTICITY_CUES):
+        triggered.append(Mode.ELASTICITY)
 
     # Fallback: if query is bare (e.g. from a scheduled trigger) use forecast.
     if not triggered:

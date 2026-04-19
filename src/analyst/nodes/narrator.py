@@ -117,6 +117,14 @@ def _narrate_with_template(result: dict[str, Any]) -> EstimateObject:
         return _tpl_counterfactual(result)
     if tool == "compute_attribution":
         return _tpl_attribution(result)
+    if tool == "denoise_signal":
+        return _tpl_denoise(result)
+    if tool == "detect_anomalies":
+        return _tpl_anomaly(result)
+    if tool == "detect_changepoints":
+        return _tpl_changepoint(result)
+    if tool == "estimate_elasticity":
+        return _tpl_elasticity(result)
     return EstimateObject(
         headline="Estimate computed",
         evidence=json.dumps(result, default=str)[:400],
@@ -125,6 +133,122 @@ def _narrate_with_template(result: dict[str, Any]) -> EstimateObject:
         action="Review result manually.",
         methodology="(unknown)",
         source_tool=tool,
+    )
+
+
+def _tpl_denoise(r: dict[str, Any]) -> EstimateObject:
+    return EstimateObject(
+        headline=(
+            f"Signal denoised: {r['restock_events']} restock events removed "
+            f"from {r['n_points']}-point series."
+        ),
+        evidence=(
+            f"Raw mean Δ={r['raw_mean']:.2f}; denoised demand mean={r['denoised_mean']:.2f}. "
+            f"Restock mass {r['restock_mass']:.0f} ({r['noise_share_pct']:.1f}% of total). "
+            f"SNR {r['signal_to_noise_db']:.1f} dB."
+        ),
+        estimate=f"True daily demand ≈ {r['denoised_mean']:.2f} units.",
+        confidence=r["confidence"].capitalize(),
+        action=(
+            "Use denoised demand as input to forecast instead of the raw series."
+        ),
+        methodology=(
+            "2-component Gaussian mixture fit by EM over day-over-day inventory "
+            "deltas. Restock = component with higher mean. Hard MAP assignment."
+        ),
+        source_tool="denoise_signal",
+    )
+
+
+def _tpl_anomaly(r: dict[str, Any]) -> EstimateObject:
+    events = r.get("events", [])
+    by_label: dict[str, int] = {}
+    for e in events:
+        by_label[e["label"]] = by_label.get(e["label"], 0) + 1
+    summary = (
+        ", ".join(f"{k}×{v}" for k, v in by_label.items())
+        if by_label
+        else "no significant anomalies"
+    )
+    headline = (
+        f"{len(events)} anomaly event(s) in {r['n_points']}-day window "
+        f"(α={r['alpha']})."
+    )
+    most_recent = events[-1] if events else None
+    estimate = (
+        f"Most recent: {most_recent['date']} — {most_recent['label']} "
+        f"(z={most_recent['z_score']:+.2f}, value={most_recent['value']:.2f})."
+        if most_recent
+        else "Series is within expected bounds."
+    )
+    return EstimateObject(
+        headline=headline,
+        evidence=f"Breakdown: {summary}. CUSUM drift statistic = {r['cusum_shift']:.2f}.",
+        estimate=estimate,
+        confidence=r["confidence"].capitalize(),
+        action=(
+            "Investigate flagged dates; cross-check with ad spend, competitor OSA, and PO activity."
+            if events
+            else "No action — series is stable."
+        ),
+        methodology=(
+            "STL-lite (rolling-median trend + weekly seasonal) → robust Z on "
+            "residuals (|z|>3.5) → Page's CUSUM for drift. Labels heuristic by series kind."
+        ),
+        source_tool="detect_anomalies",
+    )
+
+
+def _tpl_changepoint(r: dict[str, Any]) -> EstimateObject:
+    cps = r.get("changepoints", [])
+    means = r.get("segment_means", [])
+    if cps:
+        segments_str = " → ".join(f"{m:.2f}" for m in means)
+        headline = f"{len(cps)} regime shift(s) detected."
+        evidence = f"Changepoints at: {', '.join(cps)}. Segment means: {segments_str}."
+        action = "Align ops review with changepoint dates to isolate root cause."
+    else:
+        headline = "No significant regime shift in window."
+        evidence = f"Single-segment mean = {means[0]:.2f}." if means else "Series too short."
+        action = "Series is stable — keep existing cadence."
+    return EstimateObject(
+        headline=headline,
+        evidence=evidence,
+        estimate=f"k={len(cps)} changepoints at BIC penalty β={r['penalty']}.",
+        confidence=r["confidence"].capitalize(),
+        action=action,
+        methodology="PELT with Gaussian mean-shift cost and BIC penalty β = 2σ²log(n).",
+        source_tool="detect_changepoints",
+    )
+
+
+def _tpl_elasticity(r: dict[str, Any]) -> EstimateObject:
+    beta = r["elasticity"]
+    low, high = r["elasticity_ci"]
+    return EstimateObject(
+        headline=(
+            f"Price elasticity of demand = {beta:+.2f} "
+            f"({r['interpretation']})."
+        ),
+        evidence=(
+            f"95% CI [{low:+.2f}, {high:+.2f}]. R²={r['r_squared']:.2f} on "
+            f"{r['n_observations']} obs. Price range ₹{r['price_range'][0]:.0f}–₹{r['price_range'][1]:.0f}."
+        ),
+        estimate=(
+            f"A 10% price cut would shift units by ≈ {-beta * 10:+.1f}% "
+            "(holding availability constant)."
+        ),
+        confidence=r["confidence"].capitalize(),
+        action=(
+            "Pricing lever is effective — test a limited discount."
+            if r["interpretation"] == "elastic"
+            else "Price cuts will not meaningfully grow volume; focus on availability/visibility."
+        ),
+        methodology=(
+            "log-log OLS with store fixed effects via within-transform "
+            "(de-meaning). 95% CI from analytic SE under i.i.d. residuals."
+        ),
+        source_tool="estimate_elasticity",
     )
 
 

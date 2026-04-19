@@ -8,6 +8,15 @@ into probabilistic estimates across three modes:
 | **Forecast** | *Will this SKU go OOS? When? How much ₹ at risk?* | `compute_forecast` |
 | **Counterfactual** | *What would revenue have been if we'd acted / held OSA / caught the competitor window?* | `compute_counterfactual` |
 | **Causal** | *Why did revenue move? How much is availability vs visibility vs pricing vs competitor?* | `compute_attribution` |
+| **Denoise** | *What's the true demand signal once restock noise is filtered?* | `denoise_signal` |
+| **Anomaly** | *Which days are statistically-significant attack windows / stealth-OOS / promo spikes?* | `detect_anomalies` |
+| **Changepoint** | *When did the regime actually shift?* | `detect_changepoints` |
+| **Elasticity** | *How sensitive is demand to price (with 95% CI)?* | `estimate_elasticity` |
+
+The last four are things **neither Claude nor MCP can do** standalone —
+statistical inference (EM mixtures, robust z/CUSUM, PELT dynamic programming,
+log-log OLS with fixed effects) that MCP doesn't expose and that Claude can't
+reproduce in prose.
 
 The agent sits alongside the Fixer and Finder as a third brain — **statistical
 computation + LLM reasoning**, not LLM-driven gate logic.

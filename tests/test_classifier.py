@@ -38,6 +38,26 @@ def test_bare_query_defaults_to_forecast():
     assert s.modes_triggered == [Mode.FORECAST]
 
 
+def test_denoise_cue():
+    s = classify_intent(_state("can you denoise the inventory series?"))
+    assert Mode.DENOISE in s.modes_triggered
+
+
+def test_anomaly_cue():
+    s = classify_intent(_state("any unusual spikes in OSA last week?"))
+    assert Mode.ANOMALY in s.modes_triggered
+
+
+def test_changepoint_cue():
+    s = classify_intent(_state("when did the OSA regime change?"))
+    assert Mode.CHANGEPOINT in s.modes_triggered
+
+
+def test_elasticity_cue():
+    s = classify_intent(_state("what happens if we drop price by 10%?"))
+    assert Mode.ELASTICITY in s.modes_triggered
+
+
 def test_classifier_is_deterministic():
     q = "why did revenue drop and will it recover?"
     a = classify_intent(_state(q)).modes_triggered

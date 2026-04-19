@@ -14,13 +14,22 @@ discovery). It is a **statistical computation + LLM narration** system — it
 take a grounded numerical result and translate it into a brand-readable
 paragraph.
 
-Three modes map 1:1 to three tools:
+Seven modes map 1:1 to seven tools:
 
-| Mode            | Business question                               | Tool                    |
-|-----------------|-------------------------------------------------|-------------------------|
-| Forecast        | Will this SKU go OOS? How much ₹ is at risk?    | `compute_forecast`      |
-| Counterfactual  | What would have happened if we'd acted?         | `compute_counterfactual`|
-| Causal          | Why did the number move?                        | `compute_attribution`   |
+| Mode            | Business question                                        | Tool                     |
+|-----------------|----------------------------------------------------------|--------------------------|
+| Forecast        | Will this SKU go OOS? How much ₹ is at risk?             | `compute_forecast`       |
+| Counterfactual  | What would have happened if we'd acted?                  | `compute_counterfactual` |
+| Causal          | Why did the number move?                                 | `compute_attribution`    |
+| Denoise         | What's the *true* demand once restock noise is removed?  | `denoise_signal`         |
+| Anomaly         | Which days are statistical outliers (attack window / stealth-OOS / promo spike)? | `detect_anomalies` |
+| Changepoint     | When did the regime actually shift?                      | `detect_changepoints`    |
+| Elasticity      | How sensitive is demand to price?                        | `estimate_elasticity`    |
+
+The last four tools are things **neither Claude nor MCP can do**: they require
+statistical inference (EM for mixture components, robust scale estimation,
+dynamic programming for PELT, log-log OLS with fixed effects) that is not
+exposed by any MCP endpoint and that Claude cannot reproduce in prose.
 
 Anything that can be reduced to arithmetic lives in Python. Anything that looks
 like a judgement call is explicit and traceable.
@@ -141,6 +150,64 @@ pipelines), the first-order approximation is close enough.
 **V2 direction:** true Shapley with Monte-Carlo sampling (16 evaluations × N
 samples). Trivial extension — the `_revenue_under` helper already accepts
 arbitrary override sets.
+
+### 3.4 `denoise_signal` — restock-vs-consumption separator
+
+Fits a 2-component univariate Gaussian mixture to day-over-day inventory
+deltas via EM. Component with the higher mean is labelled *restock*;
+MAP-assigns each observation to a component.
+
+**Outputs:** denoised demand mean, restock events, restock mass, noise share,
+signal-to-noise ratio in dB.
+
+**Why not raw MCP?** MCP serves the raw, noisy series. Claude can eyeball
+spikes; it cannot maximum-likelihood-fit a mixture. EM in 2D converges in
+<30 iterations — no external HMM library needed for V1.
+
+**V2 direction:** swap hard EM → Baum-Welch on a proper 2-state HMM with
+transition dynamics (consumption → restock has non-trivial P(stay)).
+
+### 3.5 `detect_anomalies` — attack-window / stealth-OOS / promo-spike
+
+STL-lite (rolling-median trend + weekly seasonal) → robust Z on residuals
+(|z| > 3.5, α ≈ 0.001) → Page's CUSUM for drift detection.
+
+**Labels** (heuristic, based on `kind` hint and OSA context):
+- `attack_window_start` — OSA/SOV drop
+- `stealth_oos` — units drop when OSA was *stable* (the brand is losing sales
+  for reasons not explained by availability — pricing, competitor visibility,
+  or silent catalogue issues)
+- `promo_spike` — positive outlier
+- `availability_drop` — units drop that tracks an OSA drop
+- `drift` — CUSUM-flagged sustained shift without single-point significance
+
+**Why not raw MCP?** MCP has `get_osa_trend` but no anomaly detector; no
+false-positive rate guarantee.
+
+### 3.6 `detect_changepoints` — PELT with mBIC penalty
+
+Classic Pruned Exact Linear Time changepoint detection with Gaussian
+sum-of-squared-errors cost. Penalty β = 4σ² log(n) (Lavielle, 2005 variant 2).
+
+σ is estimated **robustly to shifts** via IQR of first differences, floored
+at min(2σ_d, std(y)) — a hedge against small-n IQR underestimation.
+
+Post-filter: rejects candidates where the Bonferroni-corrected two-sample
+z-statistic on adjacent segment means falls below 3.0.
+
+**Why not raw MCP?** MCP returns numbers; finding *when* the regime changed
+requires dynamic programming. Validated live against Foxtale Delhi OSA —
+correctly landed on 2026-04-14, matching the observed OSA drop from 90% → 83%.
+
+### 3.7 `estimate_elasticity` — log-log OLS with store FE
+
+Within-transform removes store-level fixed effects, then OLS on
+log(units) = α_i + β log(price) + ε. Emits point estimate, 95% CI
+(analytic SE), R², and an interpretation label (elastic / inelastic /
+unit_elastic).
+
+**Why not raw MCP?** Price-response estimation is not an MCP endpoint.
+Claude cannot fit a regression or produce a confidence interval.
 
 ---
 
