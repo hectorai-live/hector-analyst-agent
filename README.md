@@ -129,12 +129,14 @@ docs/
 ## Development workflow
 
 ```bash
-make install    # pip install -e '.[dev]'
-make test       # pytest
-make lint       # ruff check
-make demo       # scripts/run_demo.py — prints all three modes
-make backtest   # scripts/backtest.py — calibration gate (±3d in 4/5)
-make ci         # lint + test + backtest
+make install          # pip install -e '.[dev]'
+make test             # pytest
+make lint             # ruff check
+make demo             # scripts/run_demo.py — prints all three modes
+make backtest         # scripts/backtest.py — calibration gate (±3d in 4/5)
+make live-validation  # scripts/live_validation.py — 4 new agents on real Foxtale data
+make dashboard        # scripts/build_dashboard.py — writes docs/dashboard.html
+make ci               # lint + test + backtest
 ```
 
 ## Deployment brief

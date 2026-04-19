@@ -18,6 +18,13 @@ demo:
 backtest:
 	python scripts/backtest.py
 
+dashboard:
+	python scripts/build_dashboard.py
+	@echo "open docs/dashboard.html in your browser"
+
+live-validation:
+	python scripts/live_validation.py
+
 status:
 	analyst status
 
